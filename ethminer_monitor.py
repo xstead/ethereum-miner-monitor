@@ -18,7 +18,7 @@
 
 """
 
-    Ethereum Miner Monitor - v1.0.0
+    Ethereum Miner Monitor - v1.0.1
     ==============================================================================================
 
     Introduction:
@@ -180,7 +180,7 @@ from statistics import mean
 from email.mime.text import MIMEText
 import configparser
 
-__version__ = '1.0.0'
+__version__ = '1.0.1'
 
 
 class MinerMonitor(object):

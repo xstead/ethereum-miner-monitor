@@ -2,7 +2,7 @@
 
 **ethminer** monitoring python application for Linux (Ubuntu 16.04 LTS).
 
-*version v1.0.0*
+*version v1.0.1*
 
 ## Introduction
 
