@@ -34,14 +34,12 @@ I would be happy about a small donation. Thank you very much.
 
 ## Usage/Installation
 
-#### WARNING!
+Download or clone the repository.
 
-Please keep in mind, if you change the **MINER_PROCESS_RESTART_ENABLED** or **MINER_SYSTEM_REBOOT_ENABLED** values to **False**, the script won't work properly. These options are added for **testing purpose only**.
-
-Download the
+    user@ubuntu ~ $ 
 
 #### IMPORTANT!
-Create a default config and update the values before run python application.
+Create your own default configuration file (**config.ini**) and update the values before run python application.
 
 Create **config.ini** based on provided **default**:
 
@@ -74,6 +72,11 @@ EMAIL_SENDER = yoursender@yourdomain.com
 EMAIL_RECIPIENT = yourrecipient@yourdomain.com
 EMAIL_SUBJECT = Server reboot notification
 ```
+
+
+#### WARNING!
+
+Please keep in mind, if you change the **MINER_PROCESS_RESTART_ENABLED** or **MINER_SYSTEM_REBOOT_ENABLED** values to **False**, the script won't work properly. These options are added for **testing purpose only**.
 
 #### Test the script before setup the crontab & double check ouput
 
