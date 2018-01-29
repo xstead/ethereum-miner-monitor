@@ -1,0 +1,21 @@
+; config.ini
+[DEFAULT]
+; nvidia, amd, nvidia-amd
+MINER_GPUS_TYPE = nvidia
+
+MINER_PROCESS_RESTART_ENABLED = True
+MINER_SYSTEM_REBOOT_ENABLED = True
+
+MINER_PROCESS_ID = ethminer
+MINER_START_CMD  = sudo [YOUR PATH THE MINER]/miner.sh >> /var/log/ethereum-miner.log
+MINER_UTILIZATION_CHECK_LOOP = 5
+MINER_UTILIZATION_CHECK_DELAY = 30
+MINER_UTILIZATION_MIN_LEVEL = 10
+MINER_PROCESS_CHECK_LOOP = 5
+MINER_PROCESS_CHECK_DELAY = 30
+
+EMAIL_NOTIFICATION = False
+EMAIL_MESSAGE = Your server was restarted by miner-monitor.
+EMAIL_SENDER = yoursender@yourdomain.com
+EMAIL_RECIPIENT = yourrecipient@yourdomain.com
+EMAIL_SUBJECT = Server reboot notification
