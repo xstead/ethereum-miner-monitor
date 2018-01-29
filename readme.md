@@ -16,6 +16,18 @@
 
 * The current version was tested on **Ubuntu 16.04.3 LTS** (xenial), with **GeForce GTX 1070 Ti** cards.
 
+## Navigation
+
+* [Leave a Tip](#leave-a-tip)
+* [Prerequisites](#prerequisites)
+* [Usage/Installation](#usageinstallation)
+    * [Download](#download)
+    * [Setup Config](#setup-config)
+    * [Test Script](#test-script)
+    * [Final Setup](#final-setup)
+* [Fine Tuning](#fine-tuning)
+* [Todos](#todos)
+    
 ## Leave a Tip
 
 I would be happy about a small donation. Thank you very much.
@@ -34,6 +46,7 @@ I would be happy about a small donation. Thank you very much.
 
 ## Usage/Installation
 
+<a name="download"></a>
 Download or clone the repository.
 
     user@ubuntu ~ $ git clone https://github.com/xstead/ethereum-miner-monitor.git
@@ -42,7 +55,8 @@ Enter directory:
 
     user@ubuntu ~ $ cd ethereum-miner-monitor/
 
-#### IMPORTANT!
+
+#### IMPORTANT! <a name="setup-config"></a>
 Create your own default configuration file (**config.ini**) and update the values before run python application.
 
 Create **config.ini** based on provided **default**:
@@ -82,7 +96,7 @@ EMAIL_SUBJECT = Server reboot notification
 
 Please keep in mind, if you change the **MINER_PROCESS_RESTART_ENABLED** or **MINER_SYSTEM_REBOOT_ENABLED** values to **False**, the script won't work properly. These options are added for **testing purpose only**.
 
-#### Test the script before setup the crontab & double check ouput
+#### Test the script before setup the crontab & double check ouput <a name="test-script"></a>
 
     user@ubuntu ~ $ python3 ethminer_monitor.py
 
@@ -117,7 +131,7 @@ Sample output when miner is running but GPUs utilization is less then min. level
     ...
 
 
-#### If the results test was ok
+#### If the results test was ok <a name="final-setup"></a>
 
 Create log directory:
 
