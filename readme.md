@@ -36,7 +36,11 @@ I would be happy about a small donation. Thank you very much.
 
 Download or clone the repository.
 
-    user@ubuntu ~ $ 
+    user@ubuntu ~ $ git clone https://github.com/xstead/ethereum-miner-monitor.git
+
+Enter directory:
+
+    user@ubuntu ~ $ cd ethereum-miner-monitor/
 
 #### IMPORTANT!
 Create your own default configuration file (**config.ini**) and update the values before run python application.
@@ -80,7 +84,7 @@ Please keep in mind, if you change the **MINER_PROCESS_RESTART_ENABLED** or **MI
 
 #### Test the script before setup the crontab & double check ouput
 
-    user@ubuntu ~ $ python ethminer_monitor.py
+    user@ubuntu ~ $ python3 ethminer_monitor.py
 
 
 Sample output when miner is running:

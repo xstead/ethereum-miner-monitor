@@ -50,11 +50,15 @@
 
     Usage/Installation:
 
-        !! W A R N I N G !! Please keep in mind, if you change the MINER_PROCESS_RESTART_ENABLED or MINER_SYSTEM_REBOOT_ENABLED
-        values to False, the script won't work properly. These options are added for testing purpose only.
+
+        Download or clone the repository.
+        user@ubuntu ~ $ git clone https://github.com/xstead/ethereum-miner-monitor.git
+
+        Enter directory:
+        user@ubuntu ~ $ cd ethereum-miner-monitor/
 
         !! I M P O R T A N T !!
-        Create a default config and update/set values before run.
+        Create your own default configuration file (config.ini) and update the values before run python application.
 
         Create config.ini based on provided default:
         cp config.default config.ini
@@ -81,10 +85,14 @@
         EMAIL_SENDER = yoursender@yourdomain.com
         EMAIL_RECIPIENT = yourrecipient@yourdomain.com
         EMAIL_SUBJECT = Server reboot notification
+        ------------------------------------------------------
+
+        !! W A R N I N G !! Please keep in mind, if you change the MINER_PROCESS_RESTART_ENABLED or MINER_SYSTEM_REBOOT_ENABLED
+        values to False, the script won't work properly. These options are added for testing purpose only.
 
         Test the script before setup the crontab && double check ouput:
         ------------------------------------------------------
-        python ethminer_monitor.py
+        python3 ethminer_monitor.py
 
 
         Sample output when miner is running:
@@ -157,9 +165,15 @@
 
 """
 
+import sys
+import platform
+
+if sys.version_info[0] < 3:
+    print("Runtime Error! Must be using Python3. (your current version is: {0})".format(platform.python_version()))
+    exit(0)
+
 import subprocess
 import logging
-import sys
 import time
 import os
 from statistics import mean
@@ -167,6 +181,7 @@ from email.mime.text import MIMEText
 import configparser
 
 __version__ = '1.0.0'
+
 
 class MinerMonitor(object):
 
