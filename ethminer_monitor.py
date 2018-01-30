@@ -18,7 +18,7 @@
 
 """
 
-    Ethereum Miner Monitor - v1.0.1
+    Ethereum Miner Monitor - v1.0.2
     ==============================================================================================
 
     Introduction:
@@ -46,7 +46,8 @@
         - Installed && configured ethminer - https://github.com/ethereum-mining/ethminer
         - Installed python3 - sudo apt-get install python3
         - nvidia-smi for NVIDIA Cards
-        - aticonfig for AMD Cards ** !! W A R N I N G !! this is not implemented yet
+        - radeontop for AMD Cards - sudo apt-get install radeontop - https://github.com/clbr/radeontop
+        - latest NVIDIA Drvier and/or latest AMD Driver
 
     Usage/Installation:
 
@@ -159,7 +160,6 @@
 
     Todos:
 
-        - implement AMD Cards utilization check
         - try to restart ethminer process before reboot the system (soft-reset)
         - check ethminer logs parallel with utilization check (Submits && Accepts)
 
@@ -172,6 +172,7 @@ if sys.version_info[0] < 3:
     print("Runtime Error! Must be using Python3. (your current version is: {0})".format(platform.python_version()))
     exit(0)
 
+import re
 import subprocess
 import logging
 import time
@@ -180,7 +181,7 @@ from statistics import mean
 from email.mime.text import MIMEText
 import configparser
 
-__version__ = '1.0.1'
+__version__ = '1.0.2'
 
 
 class MinerMonitor(object):
@@ -266,8 +267,8 @@ class MinerMonitor(object):
         """
         if not self.check_command_is_available('nvidia-smi') and self.cfg['MINER_GPUS_TYPE'] in ['nvidia', 'nvidia-amd']:
             raise ValueError("The 'nvidia-smi' command is missing. Please install it before run the ethminer monitor.")
-        if not self.check_command_is_available('aticonfig') and self.cfg['MINER_GPUS_TYPE'] in ['amd', 'nvidia-amd']:
-            raise ValueError("The 'aticonfig' command is missing. Please install it before run the ethminer monitor.")
+        if not self.check_command_is_available('radeontop') and self.cfg['MINER_GPUS_TYPE'] in ['amd', 'nvidia-amd']:
+            raise ValueError("The 'radeontop' command is missing. Please install it before run the ethminer monitor.")
 
     #
     # logger
@@ -357,7 +358,12 @@ class MinerMonitor(object):
         If utilization less then 90%, suspected the card isn't working well or something.
 
         NVIDIA - timeout 2700 nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits
-        AMD - timeout 2700 aticonfig --odgc --adapter=0 | awk '/load/ {print $4}' | cut -d "%" -f1
+        AMD - timeout 2700 sudo radeontop -d - -l 1 -t 1 -b 1
+
+        @deprecated:
+            aticonfig --odgc --adapter=0 | awk '/load/ {print $4}' | cut -d "%" -f1
+            --> The new driver 'amdgpu-pro' what need 'radeontop' to query GPU load.
+            sudo apt install radeontop
 
         !! W A R N I N G !!
         AMD utilization query is not implemented yet.
@@ -372,8 +378,26 @@ class MinerMonitor(object):
             output = self.run_shell_cmd(shell_cmd).decode('utf-8').strip()
             gpu_utilization_list = output.split('\n')
 
+        elif gpus_type == 'amd':
+            shell_cmd_0 = "lspci | grep -i --color 'vga\|3d\|2d'"
+            output_0 = self.run_shell_cmd(shell_cmd_0).decode('utf-8').strip()
+            available_cards = len(output_0.split('\n'))
+
+            if available_cards >0:
+                gpu_utilization_list = []
+
+            for gpu_index in range(1, (available_cards+1)):
+                shell_cmd_1 = "timeout 2700 sudo radeontop -d - -l 1 -t 1 -b {0}".format(gpu_index)
+                output_1 = self.run_shell_cmd(shell_cmd_1).decode('utf-8').strip()
+                try:
+                    gpu_utilization_result = output_1.split('\n')[-1]
+                    gpu_utilization_value = re.search(r'gpu (.*?)\%', gpu_utilization_result).group(1)
+                    gpu_utilization_list.append(float(gpu_utilization_value))
+                except Exception as e:
+                    raise ValueError("AMD utilization query error. {0}".format(e))
+
         if not gpu_utilization_list:
-            raise ValueError("Can't get GPU's utilization data. (nvidia-smi or aticonfig is missing ?)")
+            raise ValueError("Can't get GPU's utilization data. (nvidia-smi or radeontop is missing ?)")
 
         try:
             gpu_utilization_list = [int(x) for x in gpu_utilization_list]

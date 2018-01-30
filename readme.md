@@ -2,7 +2,15 @@
 
 **ethminer** monitoring python application for Linux (Ubuntu 16.04 LTS).
 
+*version v1.0.2*
+
+- added AMD Utilization query support, now you can use with "MINER_GPUS_TYPE = amd" config.ini settings
+- AMD GPU info on Ubuntu 16.04.3 LTS need the 'radeontop' linux package, sudo apt-get install radeontop - https://github.com/clbr/radeontop
+- System for developement and tests: Ubuntu 16.04.3 LTS, AMDGPU-PRO 17.40-492261 (http://support.amd.com/en-us/kb-articles/Pages/AMDGPU-PRO-Install.aspx), AMD Radeon R9 290X GPU 
+
 *version v1.0.1*
+
+- initial commit
 
 ## Introduction
 
@@ -42,7 +50,8 @@ I would be happy about a small donation. Thank you very much.
 * Installed && configured ethminer - https://github.com/ethereum-mining/ethminer
 * Installed python3 - sudo apt-get install python3
 * nvidia-smi for NVIDIA Cards
-* aticonfig for AMD Cards - **WARNING!** this is not implemented yet
+* radeontop for AMD Cards - sudo apt-get install radeontop - https://github.com/clbr/radeontop
+* latest NVIDIA Drvier and/or latest AMD Driver
 
 ## Usage/Installation
 
@@ -170,6 +179,5 @@ Finally, test && debug:
 
 ## Todos
 
-* implement **AMD Cards** utilization check
 * try to restart ethminer process before reboot the system (soft-reset)
 * check ethminer logs parallel with utilization check (Submits && Accepts)
