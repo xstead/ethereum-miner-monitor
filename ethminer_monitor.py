@@ -265,10 +265,14 @@ class MinerMonitor(object):
 
         :return: ValueError
         """
-        if not self.check_command_is_available('nvidia-smi') and self.cfg['MINER_GPUS_TYPE'] in ['nvidia', 'nvidia-amd']:
-            raise ValueError("The 'nvidia-smi' command is missing. Please install it before run the ethminer monitor.")
-        if not self.check_command_is_available('radeontop') and self.cfg['MINER_GPUS_TYPE'] in ['amd', 'nvidia-amd']:
-            raise ValueError("The 'radeontop' command is missing. Please install it before run the ethminer monitor.")
+
+        if any(self.cfg['MINER_GPUS_TYPE'] == x for x in ['nvidia', 'nvidia-amd']):
+            if not self.check_command_is_available('nvidia-smi'):
+                raise ValueError("The 'nvidia-smi' command is missing. Please install it before run the ethminer monitor.")
+
+        if any(self.cfg['MINER_GPUS_TYPE'] == x for x in ['amd', 'nvidia-amd']):
+            if not self.check_command_is_available('radeontop'):
+                raise ValueError("The 'radeontop' command is missing. Please install it before run the ethminer monitor.")
 
     #
     # logger
@@ -343,7 +347,7 @@ class MinerMonitor(object):
         :param process_id: string, linux command name
         :return: True / False
         """
-        shell_cmd = '/usr/bin/which {0}'.format(cmd_to_check)
+        shell_cmd = 'sudo /usr/bin/which {0}'.format(cmd_to_check)
         output = self.run_shell_cmd(shell_cmd)
 
         return True if output else False
