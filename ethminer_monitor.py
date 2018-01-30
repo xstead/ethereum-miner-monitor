@@ -383,14 +383,16 @@ class MinerMonitor(object):
             gpu_utilization_list = output.split('\n')
 
         elif gpus_type == 'amd':
-            shell_cmd_0 = "lspci | grep -i --color 'vga\|3d\|2d'"
-            output_0 = self.run_shell_cmd(shell_cmd_0).decode('utf-8').strip()
-            available_cards = len(output_0.split('\n'))
 
-            if available_cards >0:
-                gpu_utilization_list = []
 
-            for gpu_index in range(1, (available_cards+1)):
+            # shell_cmd_0 = "lspci | grep -i --color 'vga\|3d\|2d'"
+            # output_0 = self.run_shell_cmd(shell_cmd_0).decode('utf-8').strip()
+            # available_cards = len(output_0.split('\n'))
+
+            available_cards = 12 # how many slots available ??
+            gpu_utilization_list = []
+
+            for gpu_index in range(0, available_cards):
                 shell_cmd_1 = "timeout 2700 sudo radeontop -d - -l 1 -t 1 -b {0}".format(gpu_index)
                 output_1 = self.run_shell_cmd(shell_cmd_1).decode('utf-8').strip()
                 try:
@@ -398,7 +400,10 @@ class MinerMonitor(object):
                     gpu_utilization_value = re.search(r'gpu (.*?)\%', gpu_utilization_result).group(1)
                     gpu_utilization_list.append(float(gpu_utilization_value))
                 except Exception as e:
-                    raise ValueError("AMD utilization query error. {0}".format(e))
+                    # included motherboard IGFX, should turn off in bios
+                    # removed raising error
+                    # self.logger.warning("AMD utilization query error. {0}".format(e))
+                    pass
 
         if not gpu_utilization_list:
             raise ValueError("Can't get GPU's utilization data. (nvidia-smi or radeontop is missing ?)")
@@ -409,7 +414,7 @@ class MinerMonitor(object):
             raise ValueError("Utilization result convert to int error. {0}".format(e))
 
         try:
-            return mean(gpu_utilization_list)
+            return round(mean(gpu_utilization_list),2)
         except Exception as e:
             raise ValueError("Average calculation error. {0}".format(e))
 
