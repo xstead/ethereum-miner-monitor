@@ -18,7 +18,7 @@
 
 """
 
-    Ethereum Miner Monitor - v1.0.2
+    Ethereum Miner Monitor - v1.0.3
     ==============================================================================================
 
     Introduction:
@@ -172,6 +172,7 @@ if sys.version_info[0] < 3:
     print("Runtime Error! Must be using Python3. (your current version is: {0})".format(platform.python_version()))
     exit(0)
 
+import multiprocessing
 import re
 import subprocess
 import logging
@@ -181,8 +182,9 @@ from statistics import mean
 from email.mime.text import MIMEText
 import configparser
 
-__version__ = '1.0.2'
+__version__ = '1.0.3'
 
+PIDFILE = "/var/run/ethminer_monitor.pid"
 
 class MinerMonitor(object):
 
@@ -607,6 +609,7 @@ class MinerMonitor(object):
 
         :return: null
         """
+
         if not self.check_process_is_running(self.cfg['MINER_PROCESS_ID']):
 
             self.logger.info(
@@ -625,20 +628,57 @@ class MinerMonitor(object):
 # --------------------------------------------------------
 def main():
     """ run monitoring system """
+    current_time = time.time()
+    pid = str(os.getpid())
 
     # create instance
     miner_monitor = MinerMonitor()
 
-    # check system
-    try:
-        miner_monitor.check_system()
-    except Exception as e:
-        miner_monitor.logger.info("System check error: {0}".format(e))
-        exit(0)
+    # check pid
+    if os.path.isfile(PIDFILE):
+        creation_time = os.path.getctime(PIDFILE)
+        if (current_time - creation_time) // (60) >= 1:
+            # remove if PID older then 1 minute
+            os.unlink(PIDFILE)
+            miner_monitor.logger.info("PID file deleted, it's too old. [pid: %s]" % PIDFILE)
+        else:
+            miner_monitor.logger.info("The monitor is already running, exiting. [pid: %s]" % PIDFILE)
+            sys.exit()
 
-    # check ethminer
-    miner_monitor.check_miner()
+    with open(PIDFILE, 'a') as out:
+        out.write(pid)
+
+    try:
+
+        # check system
+        try:
+            miner_monitor.check_system()
+        except Exception as e:
+            miner_monitor.logger.info("System check error: {0}".format(e))
+            exit(0)
+
+        # check ethminer
+        miner_monitor.check_miner()
+
+    except Exception as e:
+        miner_monitor.logger.error("System check error: {0}".format(e))
+        os.unlink(PIDFILE)
+        sys.exit()
+    finally:
+        os.unlink(PIDFILE)
 
 
 if __name__ == '__main__':
-    main()
+
+    # Start monitoring as a process
+    p = multiprocessing.Process(target=main)
+    p.start()
+
+    # Wait for 30 seconds (timeout)
+    p.join(30)
+
+    # Terminate if still active
+    if p.is_alive():
+        os.unlink(PIDFILE)
+        p.terminate()
+        p.join()
