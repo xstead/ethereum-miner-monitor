@@ -705,7 +705,7 @@ class MinerMonitor(object):
 def remove_pid():
     try:
         os.unlink(PIDFILE)
-    except Exception as e:
+    except:
         pass
 
 #
