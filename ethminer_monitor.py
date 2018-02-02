@@ -18,7 +18,7 @@
 
 """
 
-    Ethereum Miner Monitor - v1.0.3
+    Ethereum Miner Monitor - v1.0.4
     ==============================================================================================
 
     Introduction:
@@ -172,7 +172,7 @@ if sys.version_info[0] < 3:
     print("Runtime Error! Must be using Python3. (your current version is: {0})".format(platform.python_version()))
     exit(0)
 
-import multiprocessing
+from threading import Thread, Event, Condition
 import re
 import subprocess
 import logging
@@ -182,7 +182,7 @@ from statistics import mean
 from email.mime.text import MIMEText
 import configparser
 
-__version__ = '1.0.3'
+__version__ = '1.0.4'
 
 PIDFILE = "/var/run/ethminer_monitor.pid"
 
@@ -195,6 +195,10 @@ class MinerMonitor(object):
         """
         class init
         """
+
+        self.gpu_utilization_error = False
+        self.stop_gpu_utilization_check = Event()
+        self.monitoring_process_completed = Condition()
 
         # setup logger
         self.logger = self.setup_logger('miner-monitor')
@@ -298,7 +302,7 @@ class MinerMonitor(object):
     #
     # run shell command
     # --------------------------------------------------------
-    def run_shell_cmd(self,  shell_cmd, devnull=False ):
+    def run_shell_cmd(self,  shell_cmd, devnull=False, timeout=30 ):
         """
         run linux shell command with or without output
 
@@ -310,10 +314,24 @@ class MinerMonitor(object):
             null_out = open(os.devnull, 'w')
             output = subprocess.Popen(shell_cmd, shell=True, stdout=null_out)
         else:
-            process = subprocess.Popen(shell_cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            output  = process.stdout.read()
-            process.stdout.close()
-            process.wait()
+            # removed
+            # process = subprocess.Popen(shell_cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            output = None
+            try:
+                output = subprocess.check_output(shell_cmd, shell=True, timeout=timeout)
+                try:
+                    output = output.strip().decode('utf-8')
+                except:
+                    pass
+            except subprocess.CalledProcessError:
+                # self.logger.error("Command failed: {0}".format(shell_cmd))
+                pass
+            except subprocess.TimeoutExpired:
+                self.logger.error("Timeout for command: {0}".format(shell_cmd))
+
+        # output  = process.stdout.read()
+        # process.stdout.close()
+        # process.wait()
         return output
 
     #
@@ -380,23 +398,23 @@ class MinerMonitor(object):
         gpu_utilization_list = None
 
         if gpus_type == 'nvidia':
-            shell_cmd = 'timeout 2700 nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits'
-            output = self.run_shell_cmd(shell_cmd).decode('utf-8').strip()
+            shell_cmd = 'nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits'
+            output = self.run_shell_cmd(shell_cmd)
             gpu_utilization_list = output.split('\n')
 
         elif gpus_type == 'amd':
 
 
             # shell_cmd_0 = "lspci | grep -i --color 'vga\|3d\|2d'"
-            # output_0 = self.run_shell_cmd(shell_cmd_0).decode('utf-8').strip()
+            # output_0 = self.run_shell_cmd(shell_cmd_0)
             # available_cards = len(output_0.split('\n'))
 
             available_cards = 12 # how many slots available ??
             gpu_utilization_list = []
 
             for gpu_index in range(0, available_cards):
-                shell_cmd_1 = "timeout 2700 sudo radeontop -d - -l 1 -t 1 -b {0}".format(gpu_index)
-                output_1 = self.run_shell_cmd(shell_cmd_1).decode('utf-8').strip()
+                shell_cmd_1 = "sudo radeontop -d - -l 1 -t 1 -b {0}".format(gpu_index)
+                output_1 = self.run_shell_cmd(shell_cmd_1)
                 try:
                     gpu_utilization_result = output_1.split('\n')[-1]
                     gpu_utilization_value = re.search(r'gpu (.*?)\%', gpu_utilization_result).group(1)
@@ -498,6 +516,9 @@ class MinerMonitor(object):
                         # show current state
                         self.logger.warning("'{0}' process RESTART is not enabled!".format(self.cfg['MINER_PROCESS_ID']))
 
+                    with self.monitoring_process_completed:
+                        self.monitoring_process_completed.notify()
+
                     # break the loop
                     return False
 
@@ -507,6 +528,10 @@ class MinerMonitor(object):
             else:
                 # break the loop when process is running
                 self.logger.info("'{0}' Process is currently running, nothing to do.".format(self.cfg['MINER_PROCESS_ID']))
+
+                with self.monitoring_process_completed:
+                    self.monitoring_process_completed.notify()
+
                 return False
 
     #
@@ -537,6 +562,15 @@ class MinerMonitor(object):
             # start the checking loop
             while True:
 
+                # check Thread timout
+                if self.stop_gpu_utilization_check.is_set():
+                    # do not break with Timeout if gpu utilization error
+                    if not self.gpu_utilization_error:
+                        self.logger.error("Timeout limit was exceeded. Exit!")
+                        sys.exit()
+                    else:
+                        pass
+
                 # get utilization level average
                 utilization_res = self.query_gpu_utilization(self.cfg['MINER_GPUS_TYPE'])
 
@@ -549,6 +583,8 @@ class MinerMonitor(object):
                     self.logger.info("Current GPU utilization average is {0}%.".format(utilization_res))
 
                 if utilization_res <= self.cfg['MINER_UTILIZATION_MIN_LEVEL']:
+
+                    self.gpu_utilization_error = True
 
                     check_idx += 1
 
@@ -570,6 +606,9 @@ class MinerMonitor(object):
                             # show current state
                             self.logger.warning("System REBOOT is not enabled!")
 
+                        with self.monitoring_process_completed:
+                            self.monitoring_process_completed.notify()
+
                         return False
                     else:
                         self.logger.error("Current GPU utilization is less than {1}%, wait {0} sec and check again.".
@@ -577,15 +616,24 @@ class MinerMonitor(object):
 
                     # force break
                     if check_idx > (self.cfg['MINER_UTILIZATION_CHECK_LOOP']+1):
+
+                        with self.monitoring_process_completed:
+                            self.monitoring_process_completed.notify()
+
                         return False
 
                     time.sleep(self.cfg['MINER_UTILIZATION_CHECK_DELAY'])
+
                 else:
+
+                    with self.monitoring_process_completed:
+                        self.monitoring_process_completed.notify()
+
+                    self.gpu_utilization_error = False
                     return False
 
         except Exception as e:
             self.logger.error(e)
-            exit(0)
 
     #
     # check miner
@@ -620,8 +668,46 @@ class MinerMonitor(object):
         else:
             self.check_utilization_loop()
 
+    #
+    # start Thread
+    # --------------------------------------------------------
+    def start_monitor_thread(self):
+        """
+        Thread based monitor and Timeout
+
+        :return:
+        """
+
+        # check miner
+        check_thread = Thread(target=self.check_miner)
+        check_thread.start()
+        # check_thread.join(timeout=1)
+
+        # init condition
+        self.monitoring_process_completed.acquire()
+
+        # wait condition notify
+        with self.monitoring_process_completed:
+             self.monitoring_process_completed.wait()
+
+        # release condition
+        self.monitoring_process_completed.release()
+
+        # initiate stop with timeout error
+        self.stop_gpu_utilization_check.set()
+
+
 # endClass::MinerMonitor
 
+#
+# PID helper
+# --------------------------------------------------------
+def remove_pid():
+    try:
+        os.unlink(PIDFILE)
+    except Exception as e:
+        print(e)
+        pass
 
 #
 # main
@@ -639,7 +725,7 @@ def main():
         creation_time = os.path.getctime(PIDFILE)
         if (current_time - creation_time) // (60) >= 1:
             # remove if PID older then 1 minute
-            os.unlink(PIDFILE)
+            remove_pid()
             miner_monitor.logger.info("PID file deleted, it's too old. [pid: %s]" % PIDFILE)
         else:
             miner_monitor.logger.info("The monitor is already running, exiting. [pid: %s]" % PIDFILE)
@@ -655,30 +741,20 @@ def main():
             miner_monitor.check_system()
         except Exception as e:
             miner_monitor.logger.info("System check error: {0}".format(e))
-            exit(0)
+            sys.exit()
 
-        # check ethminer
-        miner_monitor.check_miner()
+        # start thread
+        miner_monitor.start_monitor_thread()
 
     except Exception as e:
         miner_monitor.logger.error("System check error: {0}".format(e))
-        os.unlink(PIDFILE)
+        remove_pid()
         sys.exit()
+
     finally:
-        os.unlink(PIDFILE)
+        remove_pid()
 
 
 if __name__ == '__main__':
-
     # Start monitoring as a process
-    p = multiprocessing.Process(target=main)
-    p.start()
-
-    # Wait for 30 seconds (timeout)
-    p.join(30)
-
-    # Terminate if still active
-    if p.is_alive():
-        os.unlink(PIDFILE)
-        p.terminate()
-        p.join()
+    main()
