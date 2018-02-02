@@ -706,7 +706,6 @@ def remove_pid():
     try:
         os.unlink(PIDFILE)
     except Exception as e:
-        print(e)
         pass
 
 #
