@@ -112,7 +112,7 @@ Please keep in mind, if you change the **MINER_PROCESS_RESTART_ENABLED** or **MI
 
 #### Test the script before setup the crontab & double check ouput <a name="test-script"></a>
 
-    user@ubuntu ~ $ python3 ethminer_monitor.py
+    user@ubuntu ~ $ sudo python3 ethminer_monitor.py
 
 
 Sample output when miner is running:
