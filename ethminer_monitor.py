@@ -18,7 +18,7 @@
 
 """
 
-    Ethereum Miner Monitor - v1.0.4
+    Ethereum Miner Monitor - v1.0.5
     ==============================================================================================
 
     Introduction:
@@ -182,7 +182,7 @@ from statistics import mean
 from email.mime.text import MIMEText
 import configparser
 
-__version__ = '1.0.4'
+__version__ = '1.0.5'
 
 PIDFILE = "/var/run/ethminer_monitor.pid"
 
@@ -345,7 +345,9 @@ class MinerMonitor(object):
         :param get_pid: bool, if True -> return the process PID or 0
         :return: True, False or PID (int)
         """
-        shell_cmd = 'ps -ef | grep "{0}" | grep -v grep  | awk \'{{print $2}}\''.format(process_id)
+        # shell_cmd = 'ps -ef | grep "{0}" | grep -v grep  | awk \'{{print $2}}\''.format(process_id)
+
+        shell_cmd = 'pgrep -x {0}'.format(process_id)
         output = self.run_shell_cmd(shell_cmd)
         if get_pid:
             pid = 0

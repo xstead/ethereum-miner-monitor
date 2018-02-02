@@ -2,6 +2,10 @@
 
 **ethminer** monitoring python application for Linux (Ubuntu 16.04 LTS).
 
+*version v1.0.5*
+
+- find process method fixed
+
 *version v1.0.4*
 
 - timeout handling fixed
