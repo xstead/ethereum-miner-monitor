@@ -18,7 +18,7 @@
 
 """
 
-    Ethereum Miner Monitor - v1.0.5
+    Ethereum Miner Monitor - v1.0.6
     ==============================================================================================
 
     Introduction:
@@ -173,6 +173,7 @@ if sys.version_info[0] < 3:
     exit(0)
 
 from threading import Thread, Event, Condition
+from multiprocessing import Process, Value
 import re
 import subprocess
 import logging
@@ -182,7 +183,7 @@ from statistics import mean
 from email.mime.text import MIMEText
 import configparser
 
-__version__ = '1.0.5'
+__version__ = '1.0.6'
 
 PIDFILE = "/var/run/ethminer_monitor.pid"
 
@@ -197,8 +198,6 @@ class MinerMonitor(object):
         """
 
         self.gpu_utilization_error = False
-        self.stop_gpu_utilization_check = Event()
-        self.monitoring_process_completed = Condition()
 
         # setup logger
         self.logger = self.setup_logger('miner-monitor')
@@ -476,7 +475,7 @@ class MinerMonitor(object):
     #
     # process checking loop
     # --------------------------------------------------------
-    def check_process_is_running_loop(self):
+    def check_process_is_running_loop(self, monitor_state):
         """
         Check ethminer is running continuously,
         still loop index is less then 'MINER_PROCESS_CHECK_LOOP'. (default: 5)
@@ -497,6 +496,9 @@ class MinerMonitor(object):
             time.sleep(self.cfg['MINER_PROCESS_CHECK_DELAY'])
 
             if not self.check_process_is_running(self.cfg['MINER_PROCESS_ID']):
+
+                # set monitor state => MINER IS NOT RUNNING
+                monitor_state.value = 3
 
                 # stop if index greater then max. allowed
                 if check_idx > self.cfg['MINER_PROCESS_CHECK_LOOP']:
@@ -522,8 +524,8 @@ class MinerMonitor(object):
                         # show current state
                         self.logger.warning("'{0}' process RESTART is not enabled!".format(self.cfg['MINER_PROCESS_ID']))
 
-                    with self.monitoring_process_completed:
-                        self.monitoring_process_completed.notify()
+                    # set monitor state => CHECK FINISHED
+                    monitor_state.value = 4
 
                     # break the loop
                     return False
@@ -535,15 +537,15 @@ class MinerMonitor(object):
                 # break the loop when process is running
                 self.logger.info("'{0}' Process is currently running, nothing to do.".format(self.cfg['MINER_PROCESS_ID']))
 
-                with self.monitoring_process_completed:
-                    self.monitoring_process_completed.notify()
+                # set monitor state => CHECK FINISHED
+                monitor_state.value = 4
 
                 return False
 
     #
     # utilization checking loop
     # --------------------------------------------------------
-    def check_utilization_loop(self):
+    def check_utilization_loop(self, monitor_state):
         """
         Check GPU utilization level.
 
@@ -563,19 +565,13 @@ class MinerMonitor(object):
         # set base index for checking loop
         check_idx = 1
 
+        # set monitor state => CHECK STARTED
+        monitor_state.value = 2
+
         try:
 
             # start the checking loop
             while True:
-
-                # check Thread timout
-                if self.stop_gpu_utilization_check.is_set():
-                    # do not break with Timeout if gpu utilization error
-                    if not self.gpu_utilization_error:
-                        self.logger.error("Timeout limit was exceeded. Exit!")
-                        sys.exit()
-                    else:
-                        pass
 
                 # get utilization level average
                 utilization_res = self.query_gpu_utilization(self.cfg['MINER_GPUS_TYPE'])
@@ -590,7 +586,8 @@ class MinerMonitor(object):
 
                 if utilization_res <= self.cfg['MINER_UTILIZATION_MIN_LEVEL']:
 
-                    self.gpu_utilization_error = True
+                    # set monitor state => GPU UTILIZATION ERROR
+                    monitor_state.value = 3
 
                     check_idx += 1
 
@@ -612,8 +609,8 @@ class MinerMonitor(object):
                             # show current state
                             self.logger.warning("System REBOOT is not enabled!")
 
-                        with self.monitoring_process_completed:
-                            self.monitoring_process_completed.notify()
+                        # set monitor state => CHECK FINISHED
+                        monitor_state.value = 4
 
                         return False
                     else:
@@ -622,33 +619,28 @@ class MinerMonitor(object):
 
                     # force break
                     if check_idx > (self.cfg['MINER_UTILIZATION_CHECK_LOOP']+1):
-
-                        with self.monitoring_process_completed:
-                            self.monitoring_process_completed.notify()
-
                         return False
 
                     time.sleep(self.cfg['MINER_UTILIZATION_CHECK_DELAY'])
 
                 else:
 
-                    with self.monitoring_process_completed:
-                        self.monitoring_process_completed.notify()
+                    # set monitor state => CHECK FINISHED
+                    monitor_state.value = 4
 
-                    self.gpu_utilization_error = False
                     return False
 
         except Exception as e:
 
-            with self.monitoring_process_completed:
-                self.monitoring_process_completed.notify()
+            # set monitor state => CHECK FINISHED
+            monitor_state.value = 4
 
             self.logger.error(e)
 
     #
     # check miner
     # --------------------------------------------------------
-    def check_miner(self):
+    def check_miner(self, monitor_state):
         """
 
         MINER_PROCESS_CHECK_LOOP -> 5 times
@@ -667,16 +659,20 @@ class MinerMonitor(object):
 
         :return: null
         """
+        monitor_state.value = 1
 
         if not self.check_process_is_running(self.cfg['MINER_PROCESS_ID']):
+
+            # set monitor state => MINER IS NOT RUNNING
+            monitor_state.value = 3
 
             self.logger.info(
                 "[{2}/{3}. check] '{0}' process is not running, wait {1} sec and check again.".
                     format(self.cfg['MINER_PROCESS_ID'], self.cfg['MINER_PROCESS_CHECK_DELAY'], 1, self.cfg['MINER_PROCESS_CHECK_LOOP']))
 
-            self.check_process_is_running_loop()
+            self.check_process_is_running_loop(monitor_state)
         else:
-            self.check_utilization_loop()
+            self.check_utilization_loop(monitor_state)
 
     #
     # start Thread
@@ -688,23 +684,30 @@ class MinerMonitor(object):
         :return:
         """
 
-        # check miner
-        check_thread = Thread(target=self.check_miner)
-        check_thread.start()
-        # check_thread.join(timeout=1)
+        # init Thread shared value
+        monitor_state = Value('i', 0)
+        p = Process(name='ethminer-monitor', target=self.check_miner, args=(monitor_state,))
+        p.start()
 
-        # init condition
-        self.monitoring_process_completed.acquire()
+        # init process start time
+        process_start = time.time()
 
-        # wait condition notify
-        with self.monitoring_process_completed:
-             self.monitoring_process_completed.wait()
+        # check monitor state, kill after Timeout exeeded
+        # and state not in 3 (GPU UTILIZATION ERROR)
+        while True:
+            time.sleep(1)
+            runtime = int(time.time() - process_start)
 
-        # release condition
-        self.monitoring_process_completed.release()
+            # end process
+            if monitor_state.value == 4:
+                break
 
-        # initiate stop with timeout error
-        self.stop_gpu_utilization_check.set()
+            if runtime >= 30 and monitor_state.value < 3:
+                self.logger.error("Timeout limit was exceeded. Exit!")
+                break
+
+        p.terminate()
+        p.join()
 
 
 # endClass::MinerMonitor

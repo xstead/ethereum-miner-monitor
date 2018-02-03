@@ -2,6 +2,12 @@
 
 **ethminer** monitoring python application for Linux (Ubuntu 16.04 LTS).
 
+*version v1.0.6*
+
+- miner check starting method completely rewrited, using multiprocessing to start background process
+- implementation of monitor state
+- handle global timeout depending on monitor state
+
 *version v1.0.5*
 
 - find process method fixed
