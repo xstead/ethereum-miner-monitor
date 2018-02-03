@@ -402,7 +402,11 @@ class MinerMonitor(object):
         if gpus_type == 'nvidia':
             shell_cmd = 'nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits'
             output = self.run_shell_cmd(shell_cmd)
-            gpu_utilization_list = output.split('\n')
+            gpu_utilization_list = []
+            try:
+                gpu_utilization_list = output.split('\n')
+            except:
+                pass
 
         elif gpus_type == 'amd':
 
@@ -635,6 +639,10 @@ class MinerMonitor(object):
                     return False
 
         except Exception as e:
+
+            with self.monitoring_process_completed:
+                self.monitoring_process_completed.notify()
+
             self.logger.error(e)
 
     #
